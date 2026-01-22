@@ -3,6 +3,8 @@
     "title": "ProShot AI",
     "subtitle": "Professional Studio Context for Your Product Photos",
     "uploadButton": "Upload Image",
+    "uploading": "Uploading...",
+    "processing": "Processing...",
     "gallery": "Your Gallery"
   },
   "Auth": {

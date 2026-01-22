@@ -3,6 +3,8 @@
     "title": "ProShot AI",
     "subtitle": "רקע סטודיו מקצועי לתמונות המוצר שלך",
     "uploadButton": "העלאת תמונה",
+    "uploading": "מעלה...",
+    "processing": "מעבד...",
     "gallery": "הגלריה שלך"
   },
   "Auth": {

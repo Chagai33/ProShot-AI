@@ -8,12 +8,14 @@ import { storage, db } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { Loader2, UploadCloud } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import { useTranslations } from 'next-intl';
 
 export function UploadZone() {
   const t = useTranslations('HomePage');
   const { user } = useAuth();
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     if (!user || acceptedFiles.length === 0) return;
@@ -30,7 +32,8 @@ export function UploadZone() {
       uploadTask.on(
         'state_changed',
         (snapshot) => {
-          // You can handle progress here if needed
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          setProgress(progress);
         },
         (error) => {
           console.error("Upload error:", error);
@@ -66,25 +69,42 @@ export function UploadZone() {
   });
 
   return (
-    <div
-      {...getRootProps()}
-      className={`border-2 border-dashed rounded-lg p-10 flex flex-col items-center justify-center cursor-pointer transition-colors
-        ${isDragActive ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-300 dark:border-gray-700 hover:border-gray-400'}
-        ${uploading ? 'opacity-50 pointer-events-none' : ''}
-      `}
-    >
-      <input {...getInputProps()} />
-      {uploading ? (
-        <Loader2 className="h-10 w-10 animate-spin text-blue-500" />
-      ) : (
-        <UploadCloud className="h-10 w-10 text-gray-400 mb-4" />
+    <div className="w-full">
+      <div
+        {...getRootProps()}
+        className={`border-2 border-dashed rounded-lg p-10 flex flex-col items-center justify-center cursor-pointer transition-colors
+          ${isDragActive ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-300 dark:border-gray-700 hover:border-gray-400'}
+          ${uploading ? 'opacity-50 pointer-events-none' : ''}
+        `}
+      >
+        <input {...getInputProps()} />
+        {uploading ? (
+          <Loader2 className="h-10 w-10 animate-spin text-blue-500" />
+        ) : (
+          <UploadCloud className="h-10 w-10 text-gray-400 mb-4" />
+        )}
+        <p className="text-center text-gray-600 dark:text-gray-300">
+          {isDragActive ? "Drop the image here" : t('uploadButton')}
+        </p>
+        <Button disabled={uploading} variant="secondary" className="mt-4 pointer-events-none">
+          Select File
+        </Button>
+      </div>
+
+      {uploading && (
+        <div className="mt-6 space-y-2">
+          <div className="flex justify-between text-sm text-gray-600 dark:text-gray-300">
+            <span>{progress < 100 ? t('uploading') : t('processing')}...</span>
+            <span>{Math.round(progress)}%</span>
+          </div>
+          <Progress value={progress} className="h-2" />
+          {progress === 100 && (
+            <p className="text-xs text-center text-muted-foreground mt-2 animate-pulse">
+              Finalizing upload and starting processing...
+            </p>
+          )}
+        </div>
       )}
-      <p className="text-center text-gray-600 dark:text-gray-300">
-        {isDragActive ? "Drop the image here" : t('uploadButton')}
-      </p>
-      <Button disabled={uploading} variant="secondary" className="mt-4 pointer-events-none">
-        Select File
-      </Button>
     </div>
   );
 }
