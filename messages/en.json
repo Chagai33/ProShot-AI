@@ -1,0 +1,17 @@
+{
+  "HomePage": {
+    "title": "ProShot AI",
+    "subtitle": "Professional Studio Context for Your Product Photos",
+    "uploadButton": "Upload Image",
+    "gallery": "Your Gallery"
+  },
+  "Auth": {
+    "login": "Login",
+    "signup": "Sign Up",
+    "logout": "Logout",
+    "google": "Continue with Google",
+    "anonymous": "Try as Guest",
+    "or": "Or",
+    "loginSubtitle": "Sign in to your account"
+  }
+}

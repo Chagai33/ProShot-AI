@@ -1,0 +1,17 @@
+{
+  "HomePage": {
+    "title": "ProShot AI",
+    "subtitle": "רקע סטודיו מקצועי לתמונות המוצר שלך",
+    "uploadButton": "העלאת תמונה",
+    "gallery": "הגלריה שלך"
+  },
+  "Auth": {
+    "login": "התחברות",
+    "signup": "הרשמה",
+    "logout": "התנתקות",
+    "google": "המשך עם Google",
+    "anonymous": "נסה כאורח",
+    "or": "או",
+    "loginSubtitle": "התחבר לחשבון שלך"
+  }
+}
