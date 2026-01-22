@@ -38,20 +38,28 @@ export const generateProfessionalBackground = onObjectFinalized({
 
   if (!uid || !fileName) return;
 
+  // --- Extract Project ID from Custom Metadata ---
+  const metadata = event.data.metadata || {};
+  const projectId = metadata.projectId;
+
+  if (!projectId) {
+    console.error(`ERROR: No 'projectId' found in customMetadata for file: ${filePath}`);
+    return;
+  }
+
+  console.log(`Processing Project: ${projectId} (File: ${filePath}, User: ${uid})`);
+
   try {
-    console.log(`Processing image: ${filePath} for user: ${uid}`);
+    // Direct document reference using projectId from metadata
+    const projectRef = db.collection("users").doc(uid).collection("projects").doc(projectId);
+    const projectDoc = await projectRef.get();
 
-    const projectsRef = db.collection("users").doc(uid).collection("projects");
-    const q = projectsRef.where("storagePath", "==", filePath).limit(1);
-    const snapshot = await q.get();
-
-    if (snapshot.empty) {
-      console.warn("No matching project found for file:", filePath);
+    if (!projectDoc.exists) {
+      console.error(`ERROR: Project document not found in Firestore for ID: ${projectId}`);
       return;
     }
 
-    const projectDoc = snapshot.docs[0];
-    await projectDoc.ref.update({ status: "processing" });
+    await projectRef.update({ status: "processing" });
 
     // Download the Image
     const bucket = storage.bucket(bucketName);
@@ -152,7 +160,7 @@ export const generateProfessionalBackground = onObjectFinalized({
     const processedUrl = resultFile.publicUrl();
 
     // Update Firestore
-    await projectDoc.ref.update({
+    await projectRef.update({
       status: "completed",
       processedUrl: processedUrl,
       updatedAt: new Date()
@@ -166,12 +174,16 @@ export const generateProfessionalBackground = onObjectFinalized({
       console.error("Error Details:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
     }
 
-    const projectsRef = db.collection("users").doc(uid).collection("projects");
-    const q = projectsRef.where("storagePath", "==", filePath).limit(1);
-    const snapshot = await q.get();
-    if (!snapshot.empty) {
-      // @ts-ignore
-      await snapshot.docs[0].ref.update({ status: "error", error: error.message || "Unknown error" });
+    // Update project status to error using metadata projectId
+    const metadata = event.data.metadata || {};
+    const projectId = metadata.projectId;
+
+    if (projectId && uid) {
+      const projectRef = db.collection("users").doc(uid).collection("projects").doc(projectId);
+      await projectRef.update({
+        status: "error",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
     }
   }
 });

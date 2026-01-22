@@ -5,7 +5,7 @@ import { useDropzone } from 'react-dropzone';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { storage, db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Loader2, UploadCloud } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -22,12 +22,23 @@ export function UploadZone() {
 
     setUploading(true);
     const file = acceptedFiles[0];
-    const fileId = crypto.randomUUID();
-    const storageRef = ref(storage, `users/${user.uid}/uploads/${fileId}_${file.name}`);
 
     try {
-      // 1. Upload to Storage
-      const uploadTask = uploadBytesResumable(storageRef, file);
+      // 1. Generate Firestore Document ID FIRST
+      const projectsCollection = collection(db, 'users', user.uid, 'projects');
+      const newProjectRef = doc(projectsCollection);
+      const projectId = newProjectRef.id;
+
+      // 2. Upload to Storage with ORIGINAL filename and metadata
+      const storageRef = ref(storage, `users/${user.uid}/uploads/${file.name}`);
+      const metadata = {
+        customMetadata: {
+          projectId: projectId,
+          originalName: file.name
+        }
+      };
+
+      const uploadTask = uploadBytesResumable(storageRef, file, metadata);
 
       uploadTask.on(
         'state_changed',
@@ -40,11 +51,11 @@ export function UploadZone() {
           setUploading(false);
         },
         async () => {
-          // 2. Get Download URL
+          // 3. Get Download URL
           const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
 
-          // 3. Create Firestore Document (Trigger for Cloud Function)
-          await addDoc(collection(db, 'users', user.uid, 'projects'), {
+          // 4. Create Firestore Document using pre-generated reference
+          await setDoc(newProjectRef, {
             originalUrl: downloadURL,
             storagePath: storageRef.fullPath,
             status: 'pending',
