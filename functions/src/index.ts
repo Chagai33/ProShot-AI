@@ -65,7 +65,8 @@ export const generateProfessionalBackground = onObjectFinalized({
     const endpoint = `projects/${PROJECT_ID}/locations/${LOCATION}/publishers/${PUBLISHER}/models/${MODEL}`;
 
     // 3. Prepare Input (Standard Image-to-Image Generation)
-    const prompt = "Professional product photography, minimalistic white studio background, soft lighting, 4k, high resolution";
+    // 3. Prepare Input (Standard Image-to-Image Generation)
+    const prompt = "High-end e-commerce product photography. Isolate the subject and place it on a pure white studio background. **CRITICAL: Strictly preserve the original colors, textures, and details of the product.** Do not alter the product's appearance. Add soft, natural studio lighting and a realistic contact shadow underneath to ground the object. The result must be hyper-realistic and professional, ready for an online store.";
 
     // IMPORTANT: Ensure base64 string does not have the "data:image/..." prefix
     const cleanBase64 = base64Image.replace(/^data:image\/(png|jpeg|jpg);base64,/, "");
