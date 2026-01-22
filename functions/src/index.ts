@@ -12,7 +12,7 @@ const storage = getStorage();
 const PROJECT_ID = "proshot-ai-a365e";
 const LOCATION = "us-central1";
 const PUBLISHER = "google";
-const MODEL = "imagen-3.0-generate-002";
+const MODEL = "imagen-3.0-capability-001";
 const API_ENDPOINT = "us-central1-aiplatform.googleapis.com";
 
 // 1. Setup Client
@@ -65,8 +65,7 @@ export const generateProfessionalBackground = onObjectFinalized({
     const endpoint = `projects/${PROJECT_ID}/locations/${LOCATION}/publishers/${PUBLISHER}/models/${MODEL}`;
 
     // 3. Prepare Input (Standard Image-to-Image Generation)
-    // 3. Prepare Input (Standard Image-to-Image Generation)
-    const prompt = "A professional product photograph showing the exact object from the input image isolated and centered on a clean, seamless white studio background. Neutral studio lighting with a soft, realistic shadow underneath.";
+    const prompt = "A high-end e-commerce shot of exactly this product. Isolate the object and place it on a seamless white background. 4k, photorealistic, sharp focus.";
 
     // IMPORTANT: Ensure base64 string does not have the "data:image/..." prefix
     const cleanBase64 = base64Image.replace(/^data:image\/(png|jpeg|jpg);base64,/, "");
@@ -82,15 +81,14 @@ export const generateProfessionalBackground = onObjectFinalized({
     // 4. Prepare Parameters
     const parameterValue = {
       sampleCount: 1,
-      aspectRatio: "1:1",
-      addWatermark: false,
-      // NEW: Crucial instructions on what NOT to do
-      negative_prompt: "altering the product, changing colors, changing textures, distortion, changing the packaging text, adding new objects, creative interpretation, blurry, low quality"
+      aspectRatio: "1:1"
+      // Note: For this specific model, if it fails demanding a mask, we will add mask logic later.
+      // For now, we mirror the Studio behavior which accepted Image + Prompt.
     };
     const parameters = helpers.toValue(parameterValue);
 
     // 5. Call API
-    console.log("Sending request to Imagen 3 (imagen-3.0-generate-002)...");
+    console.log("Sending request to Imagen 3 Capability 001...");
     console.log("Endpoint:", endpoint);
 
     const [response] = await predictionServiceClient.predict({
