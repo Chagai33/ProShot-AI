@@ -15,8 +15,7 @@ const PUBLISHER = "google";
 const API_ENDPOINT = "us-central1-aiplatform.googleapis.com";
 
 // Models
-const SEG_MODEL = "image-segmentation-001";
-const GEN_MODEL = "imagen-3.0-capability-001";
+const GEN_MODEL = "imagegeneration@006";
 
 export const generateProfessionalBackground = onObjectFinalized({
   cpu: 2,
@@ -72,66 +71,32 @@ export const generateProfessionalBackground = onObjectFinalized({
     const clientOptions = { apiEndpoint: API_ENDPOINT };
     const predictionServiceClient = new PredictionServiceClient(clientOptions);
 
-    // --- STEP 1: GENERATE MASK (Segmentation) ---
-    console.log("Step 1: Generating segmentation mask for product isolation...");
-    const segEndpoint = `projects/${PROJECT_ID}/locations/${LOCATION}/publishers/${PUBLISHER}/models/${SEG_MODEL}`;
-
-    const segInstance = helpers.toValue({
-      image: { bytesBase64Encoded: cleanBase64 }
-    });
-    // "salient_object" is typically used for main subject segmentation
-    const segParams = helpers.toValue({ segmentation_type: "salient_object" });
-
-    const [segResponse] = await predictionServiceClient.predict({
-      endpoint: segEndpoint,
-      instances: [segInstance!],
-      parameters: segParams
-    });
-
-    if (!segResponse.predictions || segResponse.predictions.length === 0) {
-      throw new Error("No segmentation mask returned.");
-    }
-
-    // Extract mask
-    const segPredictionObj = helpers.fromValue(segResponse.predictions[0] as any);
-    const maskBase64 = (segPredictionObj as any).bytesBase64Encoded;
-
-    if (!maskBase64) {
-      console.error("Segmentation response:", JSON.stringify(segPredictionObj));
-      throw new Error("Segmentation result missing bytesBase64Encoded.");
-    }
-    console.log("Mask generated successfully.");
-
-    // --- STEP 2: EDIT WITH MASK (Inpainting) ---
-    console.log("Step 2: Performing background replacement using mask...");
-    const editEndpoint = `projects/${PROJECT_ID}/locations/${LOCATION}/publishers/${PUBLISHER}/models/${GEN_MODEL}`;
+    // --- GENERATE BACKGROUND ---
+    console.log("Generating professional background...");
+    const genEndpoint = `projects/${PROJECT_ID}/locations/${LOCATION}/publishers/${PUBLISHER}/models/${GEN_MODEL}`;
 
     // Validated prompt
     const prompt = "A high-end e-commerce shot of exactly this product. Isolate the object and place it on a seamless white background. 4k, photorealistic, sharp focus.";
 
-    const editInstance = helpers.toValue({
+    const genInstance = helpers.toValue({
       prompt: prompt,
-      image: { bytesBase64Encoded: cleanBase64 },
-      mask: {
-        image: { bytesBase64Encoded: maskBase64 }
-      }
+      image: { bytesBase64Encoded: cleanBase64 }
     });
 
-    const editParams = helpers.toValue({
+    const genParams = helpers.toValue({
       sampleCount: 1,
-      aspectRatio: "1:1",
-      mode: "inpainting"
+      aspectRatio: "1:1"
     });
 
-    console.log("Sending inpainting request to Imagen 3 Capability...");
-    const [editResponse] = await predictionServiceClient.predict({
-      endpoint: editEndpoint,
-      instances: [editInstance!],
-      parameters: editParams
+    console.log(`Sending generation request to ${GEN_MODEL}...`);
+    const [genResponse] = await predictionServiceClient.predict({
+      endpoint: genEndpoint,
+      instances: [genInstance!],
+      parameters: genParams
     });
 
     // --- Process Final Result ---
-    const predictions = editResponse.predictions;
+    const predictions = genResponse.predictions;
     if (!predictions || predictions.length === 0) {
       throw new Error("No generation predictions returned.");
     }
