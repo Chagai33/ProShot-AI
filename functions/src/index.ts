@@ -12,19 +12,17 @@ const storage = getStorage();
 const PROJECT_ID = "proshot-ai-a365e";
 const LOCATION = "us-central1";
 const PUBLISHER = "google";
-const MODEL = "imagen-3.0-capability-001";
 const API_ENDPOINT = "us-central1-aiplatform.googleapis.com";
 
-// 1. Setup Client
-const clientOptions = {
-  apiEndpoint: API_ENDPOINT
-};
-const predictionServiceClient = new PredictionServiceClient(clientOptions);
+// Models
+const SEG_MODEL = "image-segmentation-001";
+const GEN_MODEL = "imagen-3.0-capability-001";
 
 export const generateProfessionalBackground = onObjectFinalized({
   cpu: 2,
   memory: "2GiB",
-  timeoutSeconds: 300
+  timeoutSeconds: 300, // Process can be long
+  region: "us-central1"
 }, async (event) => {
   const filePath = event.data.name; // users/{uid}/uploads/{fileName}
   const bucketName = event.data.bucket;
@@ -60,59 +58,83 @@ export const generateProfessionalBackground = onObjectFinalized({
     const file = bucket.file(filePath);
     const [fileBuffer] = await file.download();
     const base64Image = fileBuffer.toString("base64");
-
-    // 2. Define Endpoint Path
-    const endpoint = `projects/${PROJECT_ID}/locations/${LOCATION}/publishers/${PUBLISHER}/models/${MODEL}`;
-
-    // 3. Prepare Input (Standard Image-to-Image Generation)
-    const prompt = "A high-end e-commerce shot of exactly this product. Isolate the object and place it on a seamless white background. 4k, photorealistic, sharp focus.";
-
-    // IMPORTANT: Ensure base64 string does not have the "data:image/..." prefix
     const cleanBase64 = base64Image.replace(/^data:image\/(png|jpeg|jpg);base64,/, "");
 
-    const instanceValue = {
-      prompt: prompt,
-      image: {
-        bytesBase64Encoded: cleanBase64
-      }
-    };
-    const instance = helpers.toValue(instanceValue);
+    // Setup Vertex AI Client
+    const clientOptions = { apiEndpoint: API_ENDPOINT };
+    const predictionServiceClient = new PredictionServiceClient(clientOptions);
 
-    // 4. Prepare Parameters
-    const parameterValue = {
-      sampleCount: 1,
-      aspectRatio: "1:1"
-      // Note: For this specific model, if it fails demanding a mask, we will add mask logic later.
-      // For now, we mirror the Studio behavior which accepted Image + Prompt.
-    };
-    const parameters = helpers.toValue(parameterValue);
+    // --- STEP 1: GENERATE MASK (Segmentation) ---
+    console.log("Step 1: Generating segmentation mask for product isolation...");
+    const segEndpoint = `projects/${PROJECT_ID}/locations/${LOCATION}/publishers/${PUBLISHER}/models/${SEG_MODEL}`;
 
-    // 5. Call API
-    console.log("Sending request to Imagen 3 Capability 001...");
-    console.log("Endpoint:", endpoint);
+    const segInstance = helpers.toValue({
+      image: { bytesBase64Encoded: cleanBase64 }
+    });
+    // "salient_object" is typically used for main subject segmentation
+    const segParams = helpers.toValue({ segmentation_type: "salient_object" });
 
-    const [response] = await predictionServiceClient.predict({
-      endpoint,
-      instances: [instance!],
-      parameters
+    const [segResponse] = await predictionServiceClient.predict({
+      endpoint: segEndpoint,
+      instances: [segInstance!],
+      parameters: segParams
     });
 
-    console.log("Raw Response received.");
+    if (!segResponse.predictions || segResponse.predictions.length === 0) {
+      throw new Error("No segmentation mask returned.");
+    }
 
-    // 6. Parse Output (Protobuf)
-    const predictions = response.predictions;
+    // Extract mask
+    const segPredictionObj = helpers.fromValue(segResponse.predictions[0] as any);
+    const maskBase64 = (segPredictionObj as any).bytesBase64Encoded;
+
+    if (!maskBase64) {
+      console.error("Segmentation response:", JSON.stringify(segPredictionObj));
+      throw new Error("Segmentation result missing bytesBase64Encoded.");
+    }
+    console.log("Mask generated successfully.");
+
+    // --- STEP 2: EDIT WITH MASK (Inpainting) ---
+    console.log("Step 2: Performing background replacement using mask...");
+    const editEndpoint = `projects/${PROJECT_ID}/locations/${LOCATION}/publishers/${PUBLISHER}/models/${GEN_MODEL}`;
+
+    // Validated prompt
+    const prompt = "A high-end e-commerce shot of exactly this product. Isolate the object and place it on a seamless white background. 4k, photorealistic, sharp focus.";
+
+    const editInstance = helpers.toValue({
+      prompt: prompt,
+      image: { bytesBase64Encoded: cleanBase64 },
+      mask: {
+        image: { bytesBase64Encoded: maskBase64 }
+      }
+    });
+
+    const editParams = helpers.toValue({
+      sampleCount: 1,
+      aspectRatio: "1:1",
+      mode: "inpainting"
+    });
+
+    console.log("Sending inpainting request to Imagen 3 Capability...");
+    const [editResponse] = await predictionServiceClient.predict({
+      endpoint: editEndpoint,
+      instances: [editInstance!],
+      parameters: editParams
+    });
+
+    // --- Process Final Result ---
+    const predictions = editResponse.predictions;
     if (!predictions || predictions.length === 0) {
-      throw new Error("No predictions returned");
+      throw new Error("No generation predictions returned.");
     }
 
     // Convert Protobuf back to JS object
-    // Casting to any to avoid TS issues with Protobuf Value type
     const predictionObj = helpers.fromValue(predictions[0] as any);
     const generatedBase64 = (predictionObj as any).bytesBase64Encoded;
 
     if (!generatedBase64) {
-      console.error("Prediction Object:", JSON.stringify(predictionObj));
-      throw new Error("Prediction result is missing bytesBase64Encoded");
+      console.error("Generation Object:", JSON.stringify(predictionObj));
+      throw new Error("Generation result is missing bytesBase64Encoded.");
     }
 
     // Save the Result
@@ -136,10 +158,10 @@ export const generateProfessionalBackground = onObjectFinalized({
       updatedAt: new Date()
     });
 
-    console.log("Processing complete. Image saved to:", resultPath);
+    console.log("Processing pipeline complete. Image saved to:", resultPath);
 
   } catch (error) {
-    console.error("Error processing image:", error);
+    console.error("Error processing image pipeline:", error);
     if (error instanceof Error) {
       console.error("Error Details:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
     }
