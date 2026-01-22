@@ -1,27 +1,19 @@
-[debug] [2026-01-22T17:53:05.293Z] ----------------------------------------------------------------------
-[debug] [2026-01-22T17:53:05.297Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\Administrator\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js deploy --only functions
-[debug] [2026-01-22T17:53:05.297Z] CLI Version:   14.10.1
-[debug] [2026-01-22T17:53:05.297Z] Platform:      win32
-[debug] [2026-01-22T17:53:05.297Z] Node Version:  v22.13.0
-[debug] [2026-01-22T17:53:05.298Z] Time:          Thu Jan 22 2026 19:53:05 GMT+0200 (Israel Standard Time)
-[debug] [2026-01-22T17:53:05.298Z] ----------------------------------------------------------------------
+[debug] [2026-01-22T17:54:57.034Z] ----------------------------------------------------------------------
+[debug] [2026-01-22T17:54:57.038Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\Administrator\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js deploy --only functions
+[debug] [2026-01-22T17:54:57.038Z] CLI Version:   14.10.1
+[debug] [2026-01-22T17:54:57.038Z] Platform:      win32
+[debug] [2026-01-22T17:54:57.038Z] Node Version:  v22.13.0
+[debug] [2026-01-22T17:54:57.039Z] Time:          Thu Jan 22 2026 19:54:57 GMT+0200 (Israel Standard Time)
+[debug] [2026-01-22T17:54:57.039Z] ----------------------------------------------------------------------
 [debug] 
-[debug] [2026-01-22T17:53:05.302Z] >>> [apiv2][query] GET https://firebase-public.firebaseio.com/cli.json [none]
-[debug] [2026-01-22T17:53:05.625Z] Field "/functions" in "firebase.json" is possibly invalid: must be object
-[debug] [2026-01-22T17:53:05.626Z] Object "/functions/0" in "firebase.json" has unknown property: {"additionalProperty":"disallowLegacyRuntimeConfig"}
-[debug] [2026-01-22T17:53:05.626Z] Field "/functions" in "firebase.json" is possibly invalid: must match a schema in anyOf
-[debug] [2026-01-22T17:53:05.632Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
-[debug] [2026-01-22T17:53:05.633Z] > authorizing via signed-in user (chagai33@gmail.com)
-[debug] [2026-01-22T17:53:05.633Z] [iam] checking project proshot-ai-a365e for permissions ["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]
-[debug] [2026-01-22T17:53:05.633Z] Checked if tokens are valid: false, expires at: 1768051274564
-[debug] [2026-01-22T17:53:05.633Z] Checked if tokens are valid: false, expires at: 1768051274564
-[debug] [2026-01-22T17:53:05.634Z] > refreshing access token with scopes: []
-[debug] [2026-01-22T17:53:05.635Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
-[debug] [2026-01-22T17:53:05.635Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
-[debug] [2026-01-22T17:53:05.835Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
-[debug] [2026-01-22T17:53:05.835Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
-[debug] [2026-01-22T17:53:05.845Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/proshot-ai-a365e:testIamPermissions [none]
-[debug] [2026-01-22T17:53:05.845Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/proshot-ai-a365e:testIamPermissions x-goog-quota-user=projects/proshot-ai-a365e
-[debug] [2026-01-22T17:53:05.845Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/proshot-ai-a365e:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]}
-[debug] [2026-01-22T17:53:05.984Z] <<< [apiv2][status] GET https://firebase-public.firebaseio.com/cli.json 200
-[debug] [2026-01-22T17:53:05.984Z] <<< [apiv2][body] GET https://firebase-public.firebaseio.com/cli.json {"cloudBuildErrorAfter":1594252800000,"cloudBuildWarnAfter":1590019200000,"defaultNode10After":1594252800000,"minVersion":"3.0.5","node8DeploysDisabledAfter":1613390400000,"node8RuntimeDisabledAfter":1615809600000,"node8WarnAfter":1600128000000}
+[debug] [2026-01-22T17:54:57.302Z] Field "/functions" in "firebase.json" is possibly invalid: must be object
+[debug] [2026-01-22T17:54:57.302Z] Object "/functions/0" in "firebase.json" has unknown property: {"additionalProperty":"disallowLegacyRuntimeConfig"}
+[debug] [2026-01-22T17:54:57.303Z] Field "/functions" in "firebase.json" is possibly invalid: must match a schema in anyOf
+[debug] [2026-01-22T17:54:57.308Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-01-22T17:54:57.309Z] > authorizing via signed-in user (chagai33@gmail.com)
+[debug] [2026-01-22T17:54:57.309Z] [iam] checking project proshot-ai-a365e for permissions ["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]
+[debug] [2026-01-22T17:54:57.310Z] Checked if tokens are valid: true, expires at: 1769107984835
+[debug] [2026-01-22T17:54:57.310Z] Checked if tokens are valid: true, expires at: 1769107984835
+[debug] [2026-01-22T17:54:57.311Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/proshot-ai-a365e:testIamPermissions [none]
+[debug] [2026-01-22T17:54:57.312Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/proshot-ai-a365e:testIamPermissions x-goog-quota-user=projects/proshot-ai-a365e
+[debug] [2026-01-22T17:54:57.312Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/proshot-ai-a365e:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]}
