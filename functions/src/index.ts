@@ -15,7 +15,7 @@ const PUBLISHER = "google";
 const API_ENDPOINT = "us-central1-aiplatform.googleapis.com";
 
 // Models
-const GEN_MODEL = "imagegeneration@006";
+const GEN_MODEL = "imagen-4.0-generate-001";
 
 export const generateProfessionalBackground = onObjectFinalized({
   cpu: 2,
