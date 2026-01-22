@@ -12,13 +12,14 @@ const storage = getStorage();
 const PROJECT_ID = "proshot-ai-a365e";
 const LOCATION = "us-central1";
 const PUBLISHER = "google";
-const MODEL = "imagegeneration@005";
+const MODEL = "imagen-3.0-generate-002";
 const API_ENDPOINT = "us-central1-aiplatform.googleapis.com";
 
-// Initialize the PredictionServiceClient
-const predictionServiceClient = new PredictionServiceClient({
-  apiEndpoint: API_ENDPOINT,
-});
+// 1. Setup Client
+const clientOptions = {
+  apiEndpoint: API_ENDPOINT
+};
+const predictionServiceClient = new PredictionServiceClient(clientOptions);
 
 export const generateProfessionalBackground = onObjectFinalized({
   cpu: 2,
@@ -29,7 +30,7 @@ export const generateProfessionalBackground = onObjectFinalized({
   const bucketName = event.data.bucket;
   const contentType = event.data.contentType;
 
-  // 1. Validation: Only process images in 'uploads' folder
+  // Validation: Only process images in 'uploads' folder
   if (!filePath.includes("/uploads/") || !contentType?.startsWith("image/")) {
     return;
   }
@@ -54,58 +55,66 @@ export const generateProfessionalBackground = onObjectFinalized({
     const projectDoc = snapshot.docs[0];
     await projectDoc.ref.update({ status: "processing" });
 
-    // 2. Download the Image
+    // Download the Image
     const bucket = storage.bucket(bucketName);
     const file = bucket.file(filePath);
     const [fileBuffer] = await file.download();
     const base64Image = fileBuffer.toString("base64");
 
-    // 3. Construct the Vertex AI Prediction Request
+    // 2. Define Endpoint Path
     const endpoint = `projects/${PROJECT_ID}/locations/${LOCATION}/publishers/${PUBLISHER}/models/${MODEL}`;
 
-    const prompt = "Change the background to a clean white studio backdrop, soft lighting, professional product photography.";
+    // 3. Prepare Input (Standard Image-to-Image Generation)
+    const prompt = "Professional product photography, minimalistic white studio background, soft lighting, 4k, high resolution";
 
-    // Construct the payload exact to the user's specification for Edit Mode
-    // We split into 'instances' and 'parameters' for the API call
-    const instance = {
+    // IMPORTANT: Ensure base64 string does not have the "data:image/..." prefix
+    const cleanBase64 = base64Image.replace(/^data:image\/(png|jpeg|jpg);base64,/, "");
+
+    const instanceValue = {
       prompt: prompt,
       image: {
-        bytesBase64Encoded: base64Image
+        bytesBase64Encoded: cleanBase64
       }
     };
+    const instance = helpers.toValue(instanceValue);
 
-    // "product-image" edit mode is suitable for background replacement
-    const predictionParameters = {
+    // 4. Prepare Parameters
+    const parameterValue = {
       sampleCount: 1,
-      editConfig: {
-        editMode: 'product-image',
-      }
+      aspectRatio: "1:1",
+      addWatermark: false
     };
+    const parameters = helpers.toValue(parameterValue);
 
-    console.log("Sending prediction request to Vertex AI endpoint:", endpoint);
+    // 5. Call API
+    console.log("Sending request to Imagen 3 (imagen-3.0-generate-002)...");
+    console.log("Endpoint:", endpoint);
 
-    // TypeScript might warn about toValue if strict, but usage is generally standard for aiplatform helper
     const [response] = await predictionServiceClient.predict({
       endpoint,
-      instances: [helpers.toValue(instance)!],
-      parameters: helpers.toValue(predictionParameters),
+      instances: [instance!],
+      parameters
     });
 
-    if (!response.predictions || response.predictions.length === 0) {
-      throw new Error("No predictions returned from Vertex AI.");
+    console.log("Raw Response received.");
+
+    // 6. Parse Output (Protobuf)
+    const predictions = response.predictions;
+    if (!predictions || predictions.length === 0) {
+      throw new Error("No predictions returned");
     }
 
-    // 4. Extract generated image
-    const prediction = response.predictions[0];
-    const predictionObj = helpers.fromValue(prediction as any);
-    const generatedBase64 = (predictionObj as any)?.bytesBase64Encoded;
+    // Convert Protobuf back to JS object
+    // Casting to any to avoid TS issues with Protobuf Value type
+    const predictionObj = helpers.fromValue(predictions[0] as any);
+    const generatedBase64 = (predictionObj as any).bytesBase64Encoded;
 
     if (!generatedBase64) {
-      console.error("Prediction Result:", JSON.stringify(predictionObj));
-      throw new Error("No image data found in prediction response.");
+      console.error("Prediction Object:", JSON.stringify(predictionObj));
+      throw new Error("Prediction result is missing bytesBase64Encoded");
     }
 
-    // 5. Save the Result
+    // Save the Result
     const resultBuffer = Buffer.from(generatedBase64, 'base64');
     const resultPath = `users/${uid}/results/${fileName}`;
     const resultFile = bucket.file(resultPath);
@@ -119,7 +128,7 @@ export const generateProfessionalBackground = onObjectFinalized({
     await resultFile.makePublic();
     const processedUrl = resultFile.publicUrl();
 
-    // 6. Update Firestore
+    // Update Firestore
     await projectDoc.ref.update({
       status: "completed",
       processedUrl: processedUrl,
