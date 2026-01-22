@@ -3,6 +3,7 @@ import { initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import { helpers, PredictionServiceClient } from "@google-cloud/aiplatform";
+import { VertexAI } from "@google-cloud/vertexai";
 
 initializeApp();
 const db = getFirestore();
@@ -14,7 +15,22 @@ const LOCATION = "us-central1";
 const PUBLISHER = "google";
 const API_ENDPOINT = "us-central1-aiplatform.googleapis.com";
 
+// Helper: Retry logic for fetching Firestore document to handle eventual consistency
+async function getDocumentWithRetry(docRef: FirebaseFirestore.DocumentReference, retries = 5, delay = 1000): Promise<FirebaseFirestore.DocumentSnapshot> {
+  for (let i = 0; i < retries; i++) {
+    const doc = await docRef.get();
+    if (doc.exists) {
+      return doc;
+    }
+    console.log(`Document not found, retrying in ${delay}ms... (${i + 1}/${retries})`);
+    await new Promise(resolve => setTimeout(resolve, delay));
+  }
+  throw new Error(`Document ${docRef.path} not found after ${retries} retries.`);
+}
+
 // Models
+
+const VISION_MODEL = "gemini-2.5-flash";
 const GEN_MODEL = "imagen-4.0-generate-001";
 
 export const generateProfessionalBackground = onObjectFinalized({
@@ -51,9 +67,12 @@ export const generateProfessionalBackground = onObjectFinalized({
   try {
     // Direct document reference using projectId from metadata
     const projectRef = db.collection("users").doc(uid).collection("projects").doc(projectId);
-    const projectDoc = await projectRef.get();
+
+    // Use retry logic instead of direct get()
+    const projectDoc = await getDocumentWithRetry(projectRef);
 
     if (!projectDoc.exists) {
+      // This should be caught by getDocumentWithRetry throwing, but double check
       console.error(`ERROR: Project document not found in Firestore for ID: ${projectId}`);
       return;
     }
@@ -67,20 +86,62 @@ export const generateProfessionalBackground = onObjectFinalized({
     const base64Image = fileBuffer.toString("base64");
     const cleanBase64 = base64Image.replace(/^data:image\/(png|jpeg|jpg);base64,/, "");
 
-    // Setup Vertex AI Client
+    // Setup Vertex AI Client for Imagen
     const clientOptions = { apiEndpoint: API_ENDPOINT };
     const predictionServiceClient = new PredictionServiceClient(clientOptions);
 
-    // --- GENERATE BACKGROUND ---
-    console.log("Generating professional background...");
+    // Setup Vertex AI for Gemini (Vision Analysis)
+    const vertexAI = new VertexAI({ project: PROJECT_ID, location: LOCATION });
+    const gemini = vertexAI.getGenerativeModel({ model: VISION_MODEL });
+
+    // --- STEP A: VISION ANALYSIS ---
+    console.log("Step B: Analyzing product with Gemini Vision...");
+
+    const analysisPrompt = `Analyze this product image. Return a raw JSON object (no markdown) with two fields:
+      1. 'productDescription': A detailed visual description of the product's shape, colors, and materials. Ignore any background clutter or packaging imperfections.
+      2. 'extractedText': The exact text written on the product (in Hebrew or English).`;
+
+    const imagePart = {
+      inlineData: {
+        data: cleanBase64,
+        mimeType: "image/png" // Using strict png/jpg might be safer to detect from contentType, but cleanBase64 logic assumes it.
+      }
+    };
+
+    const analysisResult = await gemini.generateContent({
+      contents: [{ role: "user", parts: [{ text: analysisPrompt }, imagePart] }]
+    });
+
+    const analysisResponse = analysisResult.response;
+    const analysisText = analysisResponse.candidates?.[0].content.parts[0].text;
+
+    if (!analysisText) {
+      throw new Error("Gemini analysis failed to return text.");
+    }
+
+    // Clean markdown code blocks if present (Gemini sometimes wraps JSON in ```json ... ```)
+    const jsonString = analysisText.replace(/```json\n|\n```/g, "").replace(/```/g, "").trim();
+    let analysisData;
+    try {
+      analysisData = JSON.parse(jsonString);
+    } catch (e) {
+      console.error("Failed to parse Gemini JSON:", jsonString);
+      throw new Error("Gemini returned invalid JSON.");
+    }
+
+    console.log("Analysis Complete:", JSON.stringify(analysisData));
+
+    // --- STEP B: IMAGE GENERATION ---
+    console.log("Step C: Generating professional background with Imagen...");
     const genEndpoint = `projects/${PROJECT_ID}/locations/${LOCATION}/publishers/${PUBLISHER}/models/${GEN_MODEL}`;
 
-    // Validated prompt
-    const prompt = "A high-end e-commerce shot of exactly this product. Isolate the object and place it on a seamless white background. 4k, photorealistic, sharp focus.";
+    // Construct Synthesis Prompt
+    const prompt = `Professional studio photography of ${analysisData.productDescription}. The text '${analysisData.extractedText}' is clearly visible on the product. Clean white background, soft studio lighting, 4k, photorealistic.`;
+
+    console.log("Generated Prompt:", prompt);
 
     const genInstance = helpers.toValue({
-      prompt: prompt,
-      image: { bytesBase64Encoded: cleanBase64 }
+      prompt: prompt
     });
 
     const genParams = helpers.toValue({
@@ -112,7 +173,7 @@ export const generateProfessionalBackground = onObjectFinalized({
 
     // Save the Result
     const resultBuffer = Buffer.from(generatedBase64, 'base64');
-    const resultPath = `users/${uid}/results/${fileName}`;
+    const resultPath = `users/${uid}/results/${projectId}.png`;
     const resultFile = bucket.file(resultPath);
 
     await resultFile.save(resultBuffer, {
