@@ -66,7 +66,7 @@ export const generateProfessionalBackground = onObjectFinalized({
 
     // 3. Prepare Input (Standard Image-to-Image Generation)
     // 3. Prepare Input (Standard Image-to-Image Generation)
-    const prompt = "High-end e-commerce product photography. Isolate the subject and place it on a pure white studio background. **CRITICAL: Strictly preserve the original colors, textures, and details of the product.** Do not alter the product's appearance. Add soft, natural studio lighting and a realistic contact shadow underneath to ground the object. The result must be hyper-realistic and professional, ready for an online store.";
+    const prompt = "A professional product photograph showing the exact object from the input image isolated and centered on a clean, seamless white studio background. Neutral studio lighting with a soft, realistic shadow underneath.";
 
     // IMPORTANT: Ensure base64 string does not have the "data:image/..." prefix
     const cleanBase64 = base64Image.replace(/^data:image\/(png|jpeg|jpg);base64,/, "");
@@ -83,7 +83,9 @@ export const generateProfessionalBackground = onObjectFinalized({
     const parameterValue = {
       sampleCount: 1,
       aspectRatio: "1:1",
-      addWatermark: false
+      addWatermark: false,
+      // NEW: Crucial instructions on what NOT to do
+      negative_prompt: "altering the product, changing colors, changing textures, distortion, changing the packaging text, adding new objects, creative interpretation, blurry, low quality"
     };
     const parameters = helpers.toValue(parameterValue);
 
