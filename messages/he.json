@@ -1,11 +1,33 @@
 {
+  "Common": {
+    "loading": "טוען...",
+    "error": "שגיאה",
+    "retry": "נסה שוב",
+    "cancel": "ביטול",
+    "save": "שמור",
+    "selectFile": "בחר קובץ"
+  },
   "HomePage": {
     "title": "ProShot AI",
     "subtitle": "רקע סטודיו מקצועי לתמונות המוצר שלך",
     "uploadButton": "העלאת תמונה",
-    "uploading": "מעלה...",
-    "processing": "מעבד...",
+    "uploading": "מעלה",
+    "processing": "מעבד",
     "gallery": "הגלריה שלך"
+  },
+  "Upload": {
+    "dropHere": "שחרר את התמונה כאן",
+    "dragAndDrop": "גרור ושחרר תמונה כאן, או לחץ לבחירה",
+    "finalizingUpload": "משלים העלאה ומתחיל עיבוד..."
+  },
+  "Gallery": {
+    "loginRequired": "אנא התחבר כדי לצפות בגלריה שלך.",
+    "errorLoading": "שגיאה בטעינת הגלריה.",
+    "empty": "אין תמונות עדיין. העלה אחת כדי להתחיל!",
+    "statusPending": "ממתין",
+    "statusProcessing": "מעבד",
+    "statusCompleted": "הושלם",
+    "statusError": "שגיאה"
   },
   "Auth": {
     "login": "התחברות",
@@ -15,5 +37,12 @@
     "anonymous": "נסה כאורח",
     "or": "או",
     "loginSubtitle": "התחבר לחשבון שלך"
+  },
+  "Errors": {
+    "uploadFailed": "ההעלאה נכשלה. אנא נסה שוב.",
+    "networkError": "שגיאת רשת. בדוק את החיבור שלך.",
+    "authRequired": "אנא התחבר כדי להמשיך.",
+    "fileTooLarge": "הקובץ גדול מדי. גודל מקסימלי: 10MB",
+    "invalidFileType": "סוג קובץ לא תקין. רק תמונות מותרות."
   }
 }

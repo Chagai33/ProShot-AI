@@ -13,15 +13,17 @@ import { useTranslations } from 'next-intl';
 
 export function UploadZone() {
   const t = useTranslations('HomePage');
+  const tUpload = useTranslations('Upload');
+  const tCommon = useTranslations('Common');
   const { user } = useAuth();
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
-    if (!user || acceptedFiles.length === 0) return;
+    const file = acceptedFiles[0];
+    if (!user || !file) return;
 
     setUploading(true);
-    const file = acceptedFiles[0];
 
     try {
       // 1. Generate Firestore Document ID FIRST
@@ -95,10 +97,10 @@ export function UploadZone() {
           <UploadCloud className="h-10 w-10 text-gray-400 mb-4" />
         )}
         <p className="text-center text-gray-600 dark:text-gray-300">
-          {isDragActive ? "Drop the image here" : t('uploadButton')}
+          {isDragActive ? tUpload('dropHere') : t('uploadButton')}
         </p>
         <Button disabled={uploading} variant="secondary" className="mt-4 pointer-events-none">
-          Select File
+          {tCommon('selectFile')}
         </Button>
       </div>
 
@@ -111,7 +113,7 @@ export function UploadZone() {
           <Progress value={progress} className="h-2" />
           {progress === 100 && (
             <p className="text-xs text-center text-muted-foreground mt-2 animate-pulse">
-              Finalizing upload and starting processing...
+              {tUpload('finalizingUpload')}
             </p>
           )}
         </div>

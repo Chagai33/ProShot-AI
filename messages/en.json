@@ -1,11 +1,33 @@
 {
+  "Common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "retry": "Retry",
+    "cancel": "Cancel",
+    "save": "Save",
+    "selectFile": "Select File"
+  },
   "HomePage": {
     "title": "ProShot AI",
     "subtitle": "Professional Studio Context for Your Product Photos",
     "uploadButton": "Upload Image",
-    "uploading": "Uploading...",
-    "processing": "Processing...",
+    "uploading": "Uploading",
+    "processing": "Processing",
     "gallery": "Your Gallery"
+  },
+  "Upload": {
+    "dropHere": "Drop the image here",
+    "dragAndDrop": "Drag and drop an image here, or click to select",
+    "finalizingUpload": "Finalizing upload and starting processing..."
+  },
+  "Gallery": {
+    "loginRequired": "Please login to view your gallery.",
+    "errorLoading": "Error loading gallery.",
+    "empty": "No images yet. Upload one to get started!",
+    "statusPending": "Pending",
+    "statusProcessing": "Processing",
+    "statusCompleted": "Completed",
+    "statusError": "Error"
   },
   "Auth": {
     "login": "Login",
@@ -15,5 +37,12 @@
     "anonymous": "Try as Guest",
     "or": "Or",
     "loginSubtitle": "Sign in to your account"
+  },
+  "Errors": {
+    "uploadFailed": "Upload failed. Please try again.",
+    "networkError": "Network error. Check your connection.",
+    "authRequired": "Please sign in to continue.",
+    "fileTooLarge": "File is too large. Max size: 10MB",
+    "invalidFileType": "Invalid file type. Only images allowed."
   }
 }

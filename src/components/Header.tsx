@@ -1,5 +1,6 @@
 'use client';
 
+import { useCallback } from 'react';
 import { Link } from '@/i18n/routing';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { Button } from '@/components/ui/button';
@@ -13,7 +14,7 @@ export function Header() {
   const tAuth = useTranslations('Auth');
   const { user, loading } = useAuth();
 
-  const handleLogout = () => signOut(auth);
+  const handleLogout = useCallback(() => signOut(auth), []);
 
   return (
     <header className="flex h-16 w-full items-center justify-between border-b px-4 md:px-6">

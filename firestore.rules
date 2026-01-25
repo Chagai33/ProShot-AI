@@ -2,8 +2,31 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /users/{userId}/{document=**} {
+    // Users collection - private user data
+    match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Images/Projects collection - user-scoped with validation
+    match /users/{userId}/projects/{projectId} {
+      // Read: only authenticated user can read their own projects
+      allow read: if request.auth != null && request.auth.uid == userId;
+      
+      // Create: authenticated user can create with required fields
+      allow create: if request.auth != null 
+        && request.auth.uid == userId
+        && request.resource.data.keys().hasAll(['originalUrl', 'status', 'createdAt', 'name'])
+        && request.resource.data.status in ['pending', 'processing', 'completed', 'error']
+        && request.resource.data.name is string
+        && request.resource.data.originalUrl is string;
+      
+      // Update: user can update their own projects
+      allow update: if request.auth != null 
+        && request.auth.uid == userId
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['createdAt'])); // cannot modify createdAt
+      
+      // Delete: user can delete their own projects
+      allow delete: if request.auth != null && request.auth.uid == userId;
     }
   }
 }

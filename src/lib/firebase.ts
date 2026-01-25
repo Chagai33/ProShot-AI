@@ -20,3 +20,16 @@ const db = getFirestore(app);
 const storage = getStorage(app);
 
 export { app, auth, db, storage };
+
+// Type definitions
+export type ImageStatus = 'pending' | 'processing' | 'completed' | 'error';
+
+export interface ImageDocument {
+  id: string;
+  originalUrl: string;
+  processedUrl?: string;
+  status: ImageStatus;
+  name: string;
+  createdAt: number;
+  updatedAt?: number;
+}

@@ -12,6 +12,8 @@ import { useTranslations } from 'next-intl';
 import { CheckCircle2, Clock, XCircle, Loader2 as Spinner } from 'lucide-react';
 
 function StatusBadge({ status }: { status: string }) {
+  const t = useTranslations('Gallery');
+
   const styles = {
     pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 hover:bg-yellow-100",
     processing: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-100",
@@ -20,10 +22,17 @@ function StatusBadge({ status }: { status: string }) {
   };
 
   const icons = {
-    pending: <Clock className="w-3 h-3 mr-1" />,
-    processing: <Spinner className="w-3 h-3 mr-1 animate-spin" />,
-    completed: <CheckCircle2 className="w-3 h-3 mr-1" />,
-    error: <XCircle className="w-3 h-3 mr-1" />,
+    pending: <Clock className="w-3 h-3 me-1" />,
+    processing: <Spinner className="w-3 h-3 me-1 animate-spin" />,
+    completed: <CheckCircle2 className="w-3 h-3 me-1" />,
+    error: <XCircle className="w-3 h-3 me-1" />,
+  };
+
+  const labels = {
+    pending: t('statusPending'),
+    processing: t('statusProcessing'),
+    completed: t('statusCompleted'),
+    error: t('statusError'),
   };
 
   const statusKey = status as keyof typeof styles;
@@ -31,7 +40,7 @@ function StatusBadge({ status }: { status: string }) {
   return (
     <Badge className={`${styles[statusKey] || 'bg-gray-100 text-gray-800'} border-0 flex items-center`}>
       {icons[statusKey]}
-      {status.charAt(0).toUpperCase() + status.slice(1)}
+      {labels[statusKey] || status}
     </Badge>
   );
 }
@@ -46,7 +55,8 @@ interface Project {
 }
 
 export function GalleryGrid() {
-  const t = useTranslations('HomePage');
+  const t = useTranslations('Gallery');
+  const tCommon = useTranslations('Common');
   const { user } = useAuth();
 
   const [value, loading, error] = useCollection(
@@ -56,13 +66,13 @@ export function GalleryGrid() {
   );
 
   if (loading) return <div className="flex justify-center p-10"><Loader2 className="animate-spin" /></div>;
-  if (!user) return <div className="text-center p-10">Please login to view your gallery.</div>;
-  if (error) return <div className="text-red-500 text-center p-10">Error loading gallery.</div>;
+  if (!user) return <div className="text-center p-10">{t('loginRequired')}</div>;
+  if (error) return <div className="text-red-500 text-center p-10">{t('errorLoading')}</div>;
 
   const projects = value?.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Project[];
 
   if (projects?.length === 0) {
-    return <div className="text-center p-10 text-gray-500">No images yet. Upload one to get started!</div>;
+    return <div className="text-center p-10 text-gray-500">{t('empty')}</div>;
   }
 
   return (
@@ -77,7 +87,7 @@ export function GalleryGrid() {
               className="object-cover"
               sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             />
-            <div className="absolute top-2 right-2">
+            <div className="absolute top-2 end-2">
               <StatusBadge status={project.status} />
             </div>
           </CardContent>
