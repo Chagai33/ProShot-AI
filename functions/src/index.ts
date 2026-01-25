@@ -31,8 +31,7 @@ async function getDocumentWithRetry(docRef: FirebaseFirestore.DocumentReference,
 
 // Models
 
-const VISION_MODEL = "gemini-2.5-flash";
-const GEN_MODEL = "imagen-4.0-generate-001";
+const VISION_MODEL = "gemini-3-flash";
 
 export const generateProfessionalBackground = onObjectFinalized({
   cpu: 2,
@@ -144,25 +143,38 @@ export const generateProfessionalBackground = onObjectFinalized({
 
       console.log("Analysis Complete:", JSON.stringify(analysisData));
 
-      // --- STEP B: IMAGE GENERATION ---
-      console.log("Step B: Generating professional background with Imagen...");
-      const genEndpoint = `projects/${PROJECT_ID}/locations/${LOCATION}/publishers/${PUBLISHER}/models/${GEN_MODEL}`;
+      // --- STEP B: IMAGE GENERATION (Subject-Preserving) ---
+      console.log("Step B: Generating professional background with Imagen (Subject-Preserving)...");
 
-      // Construct Synthesis Prompt with User Prompt
-      const prompt = `Professional studio photography of ${analysisData.productDescription}. Context: ${userPrompt}. The text '${analysisData.extractedText}' is clearly visible on the product. Clean white background, soft studio lighting, 4k, photorealistic.`;
+      // Use the Editing/Capability model for BGSWAP
+      const EDIT_MODEL = "imagen-3.0-capability-001";
+      const genEndpoint = `projects/${PROJECT_ID}/locations/${LOCATION}/publishers/${PUBLISHER}/models/${EDIT_MODEL}`;
 
-      console.log("Generated Prompt:", prompt);
+      // Construct synthesis prompt
+      const prompt = `Professional studio photography of the product. Context: ${userPrompt}. High resolution, 4k, cinematic lighting, professional composition.`;
+
+      console.log("Target Prompt:", prompt);
 
       const genInstance = helpers.toValue({
-        prompt: prompt
+        prompt: prompt,
+        image: {
+          bytesBase64Encoded: cleanBase64
+        }
       });
 
       const genParams = helpers.toValue({
+        editConfig: {
+          editMode: "EDIT_MODE_BGSWAP",
+          maskConfig: {
+            maskMode: "MASK_MODE_BACKGROUND"
+          }
+        },
         sampleCount: 1,
-        aspectRatio: "1:1"
+        aspectRatio: "1:1",
+        addWatermark: false // Pragmatic: remove watermark if possible, or set to true if required
       });
 
-      console.log(`Sending generation request to ${GEN_MODEL}...`);
+      console.log(`Sending BGSWAP request to ${EDIT_MODEL}...`);
       const [genResponse] = await predictionServiceClient.predict({
         endpoint: genEndpoint,
         instances: [genInstance!],
@@ -172,7 +184,7 @@ export const generateProfessionalBackground = onObjectFinalized({
       // --- Process Final Result ---
       const predictions = genResponse.predictions;
       if (!predictions || predictions.length === 0) {
-        throw new Error("No generation predictions returned.");
+        throw new Error("No generation predictions returned from Imagen.");
       }
 
       // Convert Protobuf back to JS object
