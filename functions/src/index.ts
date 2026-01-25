@@ -6,6 +6,9 @@ import { helpers, PredictionServiceClient } from "@google-cloud/aiplatform";
 import { VertexAI } from "@google-cloud/vertexai";
 
 
+
+// Version: 1.1.0 (Subject-Preserving Update)
+
 initializeApp();
 const db = getFirestore();
 const storage = getStorage();
