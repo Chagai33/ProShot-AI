@@ -216,8 +216,11 @@ export const generateProfessionalBackground = onObjectFinalized({
       console.log(`Sanitized PNG size: ${sanitizedBuffer.length} bytes`);
 
       // Remove background
-      // @imgly/background-removal-node returns a Blob
-      const blob = await removeBackground(sanitizedBuffer);
+      // @imgly/background-removal-node expects a Blob or specific URL in strict environments
+      // Creating a Blob from the buffer ensures the type is correctly recognized
+      const blobInput = new Blob([new Uint8Array(sanitizedBuffer)], { type: 'image/png' });
+
+      const blob = await removeBackground(blobInput);
       const arrayBuffer = await blob.arrayBuffer();
       const transparentBuffer = Buffer.from(arrayBuffer);
 
