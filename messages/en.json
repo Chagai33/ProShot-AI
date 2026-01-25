@@ -18,7 +18,9 @@
   "Upload": {
     "dropHere": "Drop the image here",
     "dragAndDrop": "Drag and drop an image here, or click to select",
-    "finalizingUpload": "Finalizing upload and starting processing..."
+    "finalizingUpload": "Finalizing upload and starting processing...",
+    "promptLabel": "Special instructions for editing (optional)",
+    "promptPlaceholder": "e.g., Place the product on a dark wooden table..."
   },
   "Gallery": {
     "loginRequired": "Please login to view your gallery.",

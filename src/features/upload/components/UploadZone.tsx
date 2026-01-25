@@ -9,6 +9,7 @@ import { collection, doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Loader2, UploadCloud } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
+import { Textarea } from '@/components/ui/textarea';
 import { useTranslations } from 'next-intl';
 
 export function UploadZone() {
@@ -17,7 +18,9 @@ export function UploadZone() {
   const tCommon = useTranslations('Common');
   const { user } = useAuth();
   const [uploading, setUploading] = useState(false);
+
   const [progress, setProgress] = useState(0);
+  const [userPrompt, setUserPrompt] = useState('');
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
@@ -32,11 +35,15 @@ export function UploadZone() {
       const projectId = newProjectRef.id;
 
       // 2. Upload to Storage with ORIGINAL filename and metadata
+      // 2. Upload to Storage with ORIGINAL filename and metadata
       const storageRef = ref(storage, `users/${user.uid}/uploads/${file.name}`);
       const metadata = {
         customMetadata: {
           projectId: projectId,
-          originalName: file.name
+          originalName: file.name,
+          // userPrompt must be a string for Firebase metadata, or omitted. 
+          // Using empty string if falsy, or ensuring string type.
+          userPrompt: userPrompt || ""
         }
       };
 
@@ -72,7 +79,7 @@ export function UploadZone() {
       console.error("Error uploading:", error);
       setUploading(false);
     }
-  }, [user]);
+  }, [user, userPrompt]); // Add userPrompt to dependency array
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -82,7 +89,20 @@ export function UploadZone() {
   });
 
   return (
-    <div className="w-full">
+    <div className="w-full space-y-4">
+      <div className="space-y-2">
+        <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-gray-700 dark:text-gray-300">
+          {tUpload('promptLabel')}
+        </label>
+        <Textarea
+          placeholder={tUpload('promptPlaceholder')}
+          value={userPrompt}
+          onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setUserPrompt(e.target.value)}
+          disabled={uploading}
+          className="resize-none"
+        />
+      </div>
+
       <div
         {...getRootProps()}
         className={`border-2 border-dashed rounded-lg p-10 flex flex-col items-center justify-center cursor-pointer transition-colors

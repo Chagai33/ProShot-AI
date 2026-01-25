@@ -3,6 +3,8 @@ import { initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import { helpers, PredictionServiceClient } from "@google-cloud/aiplatform";
+import { VertexAI } from "@google-cloud/vertexai";
+
 
 initializeApp();
 const db = getFirestore();
@@ -14,9 +16,23 @@ const LOCATION = "us-central1";
 const PUBLISHER = "google";
 const API_ENDPOINT = "us-central1-aiplatform.googleapis.com";
 
+// Helper: Retry logic for fetching Firestore document to handle eventual consistency
+async function getDocumentWithRetry(docRef: FirebaseFirestore.DocumentReference, retries = 5, delay = 1000): Promise<FirebaseFirestore.DocumentSnapshot> {
+  for (let i = 0; i < retries; i++) {
+    const doc = await docRef.get();
+    if (doc.exists) {
+      return doc;
+    }
+    console.log(`Document not found, retrying in ${delay}ms... (${i + 1}/${retries})`);
+    await new Promise(resolve => setTimeout(resolve, delay));
+  }
+  throw new Error(`Document ${docRef.path} not found after ${retries} retries.`);
+}
+
 // Models
-const SEG_MODEL = "image-segmentation-001";
-const GEN_MODEL = "imagen-3.0-capability-001";
+
+const VISION_MODEL = "gemini-2.5-flash";
+const GEN_MODEL = "imagen-4.0-generate-001";
 
 export const generateProfessionalBackground = onObjectFinalized({
   cpu: 2,
@@ -41,6 +57,7 @@ export const generateProfessionalBackground = onObjectFinalized({
   // --- Extract Project ID from Custom Metadata ---
   const metadata = event.data.metadata || {};
   const projectId = metadata.projectId;
+  const userPrompt = metadata.userPrompt; // Check for user prompt
 
   if (!projectId) {
     console.error(`ERROR: No 'projectId' found in customMetadata for file: ${filePath}`);
@@ -48,13 +65,21 @@ export const generateProfessionalBackground = onObjectFinalized({
   }
 
   console.log(`Processing Project: ${projectId} (File: ${filePath}, User: ${uid})`);
+  if (userPrompt) {
+    console.log(`Mode: Creative AI (Prompt: "${userPrompt}")`);
+  } else {
+    console.log("Mode: High Fidelity (Background Removal)");
+  }
 
   try {
     // Direct document reference using projectId from metadata
     const projectRef = db.collection("users").doc(uid).collection("projects").doc(projectId);
-    const projectDoc = await projectRef.get();
+
+    // Use retry logic instead of direct get()
+    const projectDoc = await getDocumentWithRetry(projectRef);
 
     if (!projectDoc.exists) {
+      // This should be caught by getDocumentWithRetry throwing, but double check
       console.error(`ERROR: Project document not found in Firestore for ID: ${projectId}`);
       return;
     }
@@ -65,89 +90,137 @@ export const generateProfessionalBackground = onObjectFinalized({
     const bucket = storage.bucket(bucketName);
     const file = bucket.file(filePath);
     const [fileBuffer] = await file.download();
-    const base64Image = fileBuffer.toString("base64");
-    const cleanBase64 = base64Image.replace(/^data:image\/(png|jpeg|jpg);base64,/, "");
 
-    // Setup Vertex AI Client
-    const clientOptions = { apiEndpoint: API_ENDPOINT };
-    const predictionServiceClient = new PredictionServiceClient(clientOptions);
+    let resultBuffer: Buffer;
 
-    // --- STEP 1: GENERATE MASK (Segmentation) ---
-    console.log("Step 1: Generating segmentation mask for product isolation...");
-    const segEndpoint = `projects/${PROJECT_ID}/locations/${LOCATION}/publishers/${PUBLISHER}/models/${SEG_MODEL}`;
+    if (userPrompt) {
+      // --- MODE B: CREATIVE AI (Gemini + Imagen) ---
 
-    const segInstance = helpers.toValue({
-      image: { bytesBase64Encoded: cleanBase64 }
-    });
-    // "salient_object" is typically used for main subject segmentation
-    const segParams = helpers.toValue({ segmentation_type: "salient_object" });
+      const base64Image = fileBuffer.toString("base64");
+      const cleanBase64 = base64Image.replace(/^data:image\/(png|jpeg|jpg);base64,/, "");
 
-    const [segResponse] = await predictionServiceClient.predict({
-      endpoint: segEndpoint,
-      instances: [segInstance!],
-      parameters: segParams
-    });
+      // Setup Vertex AI Client for Imagen
+      const clientOptions = { apiEndpoint: API_ENDPOINT };
+      const predictionServiceClient = new PredictionServiceClient(clientOptions);
 
-    if (!segResponse.predictions || segResponse.predictions.length === 0) {
-      throw new Error("No segmentation mask returned.");
-    }
+      // Setup Vertex AI for Gemini (Vision Analysis)
+      const vertexAI = new VertexAI({ project: PROJECT_ID, location: LOCATION });
+      const gemini = vertexAI.getGenerativeModel({ model: VISION_MODEL });
 
-    // Extract mask
-    const segPredictionObj = helpers.fromValue(segResponse.predictions[0] as any);
-    const maskBase64 = (segPredictionObj as any).bytesBase64Encoded;
+      // --- STEP A: VISION ANALYSIS ---
+      console.log("Step A: Analyzing product with Gemini Vision...");
 
-    if (!maskBase64) {
-      console.error("Segmentation response:", JSON.stringify(segPredictionObj));
-      throw new Error("Segmentation result missing bytesBase64Encoded.");
-    }
-    console.log("Mask generated successfully.");
+      const analysisPrompt = `Analyze this product image. Return a raw JSON object (no markdown) with two fields:
+        1. 'productDescription': A detailed visual description of the product's shape, colors, and materials. Ignore any background clutter or packaging imperfections.
+        2. 'extractedText': The exact text written on the product (in Hebrew or English).`;
 
-    // --- STEP 2: EDIT WITH MASK (Inpainting) ---
-    console.log("Step 2: Performing background replacement using mask...");
-    const editEndpoint = `projects/${PROJECT_ID}/locations/${LOCATION}/publishers/${PUBLISHER}/models/${GEN_MODEL}`;
+      const imagePart = {
+        inlineData: {
+          data: cleanBase64,
+          mimeType: "image/png" // Using strict png/jpg might be safer to detect from contentType, but cleanBase64 logic assumes it.
+        }
+      };
 
-    // Validated prompt
-    const prompt = "A high-end e-commerce shot of exactly this product. Isolate the object and place it on a seamless white background. 4k, photorealistic, sharp focus.";
+      const analysisResult = await gemini.generateContent({
+        contents: [{ role: "user", parts: [{ text: analysisPrompt }, imagePart] }]
+      });
 
-    const editInstance = helpers.toValue({
-      prompt: prompt,
-      image: { bytesBase64Encoded: cleanBase64 },
-      mask: {
-        image: { bytesBase64Encoded: maskBase64 }
+      const analysisResponse = analysisResult.response;
+      const analysisText = analysisResponse.candidates?.[0].content.parts[0].text;
+
+      if (!analysisText) {
+        throw new Error("Gemini analysis failed to return text.");
       }
-    });
 
-    const editParams = helpers.toValue({
-      sampleCount: 1,
-      aspectRatio: "1:1",
-      mode: "inpainting"
-    });
+      // Clean markdown code blocks if present (Gemini sometimes wraps JSON in ```json ... ```)
+      const jsonString = analysisText.replace(/```json\n|\n```/g, "").replace(/```/g, "").trim();
+      let analysisData;
+      try {
+        analysisData = JSON.parse(jsonString);
+      } catch (e) {
+        console.error("Failed to parse Gemini JSON:", jsonString);
+        throw new Error("Gemini returned invalid JSON.");
+      }
 
-    console.log("Sending inpainting request to Imagen 3 Capability...");
-    const [editResponse] = await predictionServiceClient.predict({
-      endpoint: editEndpoint,
-      instances: [editInstance!],
-      parameters: editParams
-    });
+      console.log("Analysis Complete:", JSON.stringify(analysisData));
 
-    // --- Process Final Result ---
-    const predictions = editResponse.predictions;
-    if (!predictions || predictions.length === 0) {
-      throw new Error("No generation predictions returned.");
-    }
+      // --- STEP B: IMAGE GENERATION ---
+      console.log("Step B: Generating professional background with Imagen...");
+      const genEndpoint = `projects/${PROJECT_ID}/locations/${LOCATION}/publishers/${PUBLISHER}/models/${GEN_MODEL}`;
 
-    // Convert Protobuf back to JS object
-    const predictionObj = helpers.fromValue(predictions[0] as any);
-    const generatedBase64 = (predictionObj as any).bytesBase64Encoded;
+      // Construct Synthesis Prompt with User Prompt
+      const prompt = `Professional studio photography of ${analysisData.productDescription}. Context: ${userPrompt}. The text '${analysisData.extractedText}' is clearly visible on the product. Clean white background, soft studio lighting, 4k, photorealistic.`;
 
-    if (!generatedBase64) {
-      console.error("Generation Object:", JSON.stringify(predictionObj));
-      throw new Error("Generation result is missing bytesBase64Encoded.");
+      console.log("Generated Prompt:", prompt);
+
+      const genInstance = helpers.toValue({
+        prompt: prompt
+      });
+
+      const genParams = helpers.toValue({
+        sampleCount: 1,
+        aspectRatio: "1:1"
+      });
+
+      console.log(`Sending generation request to ${GEN_MODEL}...`);
+      const [genResponse] = await predictionServiceClient.predict({
+        endpoint: genEndpoint,
+        instances: [genInstance!],
+        parameters: genParams
+      });
+
+      // --- Process Final Result ---
+      const predictions = genResponse.predictions;
+      if (!predictions || predictions.length === 0) {
+        throw new Error("No generation predictions returned.");
+      }
+
+      // Convert Protobuf back to JS object
+      const predictionObj = helpers.fromValue(predictions[0] as any);
+      const generatedBase64 = (predictionObj as any).bytesBase64Encoded;
+
+      if (!generatedBase64) {
+        console.error("Generation Object:", JSON.stringify(predictionObj));
+        throw new Error("Generation result is missing bytesBase64Encoded.");
+      }
+
+      resultBuffer = Buffer.from(generatedBase64, 'base64');
+
+    } else {
+      // --- MODE A: HIGH FIDELITY (Background Removal) ---
+      console.log("Starting Background Removal...");
+
+      // Dynamic lazy import to avoid deployment/initialization issues
+      const { removeBackground } = await import("@imgly/background-removal-node");
+      const sharp = (await import("sharp")).default;
+
+      // Sanitize image using Sharp to ensure clean format for @imgly
+      console.log(`Original image size: ${fileBuffer.length} bytes`);
+      const sanitizedBuffer = await sharp(fileBuffer)
+        .toFormat('png')
+        .ensureAlpha()
+        .toBuffer();
+
+      console.log(`Sanitized PNG size: ${sanitizedBuffer.length} bytes`);
+
+      // Remove background
+      // @imgly/background-removal-node returns a Blob
+      const blob = await removeBackground(sanitizedBuffer);
+      const arrayBuffer = await blob.arrayBuffer();
+      const transparentBuffer = Buffer.from(arrayBuffer);
+
+      // Composite onto white background using Sharp
+      console.log("Compositing onto white background...");
+      const image = sharp(transparentBuffer);
+
+      resultBuffer = await image
+        .flatten({ background: { r: 255, g: 255, b: 255 } }) // Flatten alpha channel onto white
+        .toFormat('png')
+        .toBuffer();
     }
 
     // Save the Result
-    const resultBuffer = Buffer.from(generatedBase64, 'base64');
-    const resultPath = `users/${uid}/results/${fileName}`;
+    const resultPath = `users/${uid}/results/${projectId}.png`;
     const resultFile = bucket.file(resultPath);
 
     await resultFile.save(resultBuffer, {
